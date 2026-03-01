@@ -215,7 +215,7 @@ async function generate() {
 
   // Simple elapsed-time + rough estimate indicator
   const chars = text.length;
-  const estimatedSeconds = Math.max(5, Math.round(chars / 25)); // ~25 chars/sec heuristic
+  const estimatedSeconds = Math.max(5, Math.round(chars / 18)); // tuned: ~18 chars/sec on your setup
   let elapsed = 0;
   setProgress(elapsed, estimatedSeconds);
   const timer = setInterval(() => {
