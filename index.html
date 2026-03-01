@@ -68,6 +68,13 @@
       <button id="saveVoiceBtn" class="secondary" disabled>Save as Voice</button>
     </div>
 
+    <section id="progressWrap" class="progress-wrap hidden" aria-live="polite">
+      <div id="progressText" class="progress-text">Generating... 0% (0 / 1 tokens)</div>
+      <div class="progress-track">
+        <div id="progressBar" class="progress-bar" style="width:0%"></div>
+      </div>
+    </section>
+
     <audio id="player" controls></audio>
     <pre id="status"></pre>
   </main>

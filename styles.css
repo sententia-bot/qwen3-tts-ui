@@ -177,3 +177,33 @@ button.danger {
   width: auto;
   background: #8b2e2e;
 }
+
+
+.progress-wrap {
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+}
+
+.progress-text {
+  color: var(--muted);
+  margin-bottom: 8px;
+  font-size: 0.95rem;
+}
+
+.progress-track {
+  width: 100%;
+  height: 12px;
+  border-radius: 999px;
+  background: #273042;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, var(--primary), #46a0ff);
+  transition: width 120ms linear;
+}

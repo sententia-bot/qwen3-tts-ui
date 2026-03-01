@@ -19,6 +19,9 @@ const el = {
   generateBtn: document.getElementById('generateBtn'),
   downloadBtn: document.getElementById('downloadBtn'),
   saveVoiceBtn: document.getElementById('saveVoiceBtn'),
+  progressWrap: document.getElementById('progressWrap'),
+  progressText: document.getElementById('progressText'),
+  progressBar: document.getElementById('progressBar'),
   player: document.getElementById('player'),
   status: document.getElementById('status'),
   textFileBtn: document.getElementById('textFileBtn'),
@@ -28,6 +31,27 @@ const el = {
 let currentMode = 'clone';
 let lastBlob = null;
 let referenceAudioFiles = [];
+
+
+function b64ToBlob(b64, mime) {
+  const binary = atob(b64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: mime });
+}
+
+function setProgress(pct, tokens, estimated) {
+  const safePct = Math.max(0, Math.min(100, Number(pct) || 0));
+  el.progressWrap.classList.remove('hidden');
+  el.progressBar.style.width = `${safePct}%`;
+  el.progressText.textContent = `Generating... ${safePct}% (${tokens} / ${estimated} tokens)`;
+}
+
+function resetProgress() {
+  el.progressWrap.classList.add('hidden');
+  el.progressBar.style.width = '0%';
+  el.progressText.textContent = 'Generating... 0% (0 / 1 tokens)';
+}
 
 function setStatus(msg) { el.status.textContent = msg; }
 
@@ -182,6 +206,12 @@ async function generate() {
 
   setStatus('Generating...');
   el.generateBtn.disabled = true;
+  el.downloadBtn.disabled = true;
+  el.saveVoiceBtn.disabled = true;
+  lastBlob = null;
+  resetProgress();
+  setProgress(0, 0, 1);
+
   try {
     const payload = {
       text,
@@ -192,24 +222,83 @@ async function generate() {
       voice_description: currentMode === 'design' ? (el.voiceDescription.value.trim() || null) : null,
     };
 
-    const res = await fetch('/api/tts', {
+    const res = await fetch('/api/tts/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
 
     if (!res.ok) {
+      resetProgress();
       setStatus(`Generation failed: ${await res.text()}`);
       return;
     }
 
-    const blob = await res.blob();
-    lastBlob = blob;
-    const url = URL.createObjectURL(blob);
-    el.player.src = url;
-    el.downloadBtn.disabled = false;
-    el.saveVoiceBtn.disabled = false;
-    setStatus('Done.');
+    if (!res.body) {
+      resetProgress();
+      setStatus('Generation failed: no response stream body.');
+      return;
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let eventType = null;
+    let doneReceived = false;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      const lines = buffer.split('
+');
+      buffer = lines.pop() || '';
+
+      for (const rawLine of lines) {
+        const line = rawLine.trimEnd();
+        if (!line) {
+          eventType = null;
+          continue;
+        }
+        if (line.startsWith('event: ')) {
+          eventType = line.slice(7).trim();
+          continue;
+        }
+        if (!line.startsWith('data: ')) continue;
+
+        let payloadData;
+        try {
+          payloadData = JSON.parse(line.slice(6));
+        } catch (err) {
+          setStatus(`Stream parse error: ${err.message || err}`);
+          continue;
+        }
+
+        if (eventType === 'progress') {
+          setProgress(payloadData.pct ?? 0, payloadData.tokens ?? 0, payloadData.estimated_total ?? 1);
+        } else if (eventType === 'done') {
+          doneReceived = true;
+          setProgress(100, payloadData.tokens_generated ?? 0, payloadData.tokens_generated ?? 1);
+          const blob = b64ToBlob(payloadData.audio_b64, 'audio/wav');
+          lastBlob = blob;
+          const url = URL.createObjectURL(blob);
+          el.player.src = url;
+          el.downloadBtn.disabled = false;
+          el.saveVoiceBtn.disabled = false;
+          setStatus('Done.');
+          resetProgress();
+        } else if (eventType === 'error') {
+          resetProgress();
+          setStatus(`Generation failed: ${payloadData.detail || 'unknown error'}`);
+        }
+      }
+    }
+
+    if (!doneReceived && lastBlob === null) {
+      resetProgress();
+      setStatus('Generation ended without done event.');
+    }
   } finally {
     el.generateBtn.disabled = false;
   }
