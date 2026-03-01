@@ -21,6 +21,7 @@ const el = {
   generateBtn: document.getElementById('generateBtn'),
   downloadBtn: document.getElementById('downloadBtn'),
   saveVoiceBtn: document.getElementById('saveVoiceBtn'),
+  hardResetBtn: document.getElementById('hardResetBtn'),
   progressWrap: document.getElementById('progressWrap'),
   progressText: document.getElementById('progressText'),
   progressBar: document.getElementById('progressBar'),
@@ -199,6 +200,37 @@ async function uploadReferenceAudio() {
   updateSelectedReference();
 }
 
+async function hardReset() {
+  if (!confirm('Hard reset will unload the current model from GPU memory. Continue?')) return;
+
+  el.hardResetBtn.disabled = true;
+  setStatus('Running hard reset...');
+
+  try {
+    const res = await fetch('/reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ restart: false }),
+    });
+
+    if (!res.ok) {
+      setStatus(`Hard reset failed: ${await res.text()}`);
+      return;
+    }
+
+    lastBlob = null;
+    el.player.removeAttribute('src');
+    el.player.load();
+    el.downloadBtn.disabled = true;
+    el.saveVoiceBtn.disabled = true;
+    setStatus('Hard reset complete. Model state cleared.');
+  } catch (err) {
+    setStatus(`Hard reset failed: ${err.message || err}`);
+  } finally {
+    el.hardResetBtn.disabled = false;
+  }
+}
+
 async function generate() {
   const text = el.text.value.trim();
   if (!text) return setStatus('Text is required.');
@@ -370,6 +402,7 @@ el.manageVoicesBtn.addEventListener('click', () => {
 el.generateBtn.addEventListener('click', generate);
 el.downloadBtn.addEventListener('click', downloadAudio);
 el.saveVoiceBtn.addEventListener('click', saveAsVoice);
+el.hardResetBtn.addEventListener('click', hardReset);
 
 (async function init() {
   loadLanguages();
