@@ -3,21 +3,24 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Qwen3 TTS UI</title>
+  <title>Qwen3 TTS</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <main class="container">
-    <h1>Qwen3 TTS UI</h1>
+    <h1>Qwen3 TTS</h1>
 
-    <div id="modelStatusBar" class="model-status idle" aria-live="polite">⚪ <strong>Idle</strong></div>
 
     <label>Text</label>
-    <textarea id="text" rows="6" placeholder="Type text to synthesize..."></textarea>
+    <div class="text-input-wrap">
+      <textarea id="text" rows="6" placeholder="Type text to synthesize..."></textarea>
+      <button id="textFileBtn" type="button" class="icon-btn secondary" title="Load text file" aria-label="Load text file">📄</button>
+      <input id="textFileInput" type="file" accept=".txt,.md,text/plain,text/markdown" hidden />
+    </div>
 
     <div class="mode-switch" id="modeSwitch" role="radiogroup" aria-label="Synthesis mode">
       <button type="button" class="mode-btn active" data-mode="clone" aria-checked="true">Clone</button>
-      <button type="button" class="mode-btn inactive" data-mode="design" aria-checked="false">Design</button>
+      <button type="button" class="mode-btn" data-mode="design" aria-checked="false">Design</button>
     </div>
 
     <div class="grid">
@@ -52,7 +55,6 @@
       </div>
       <div class="actions">
         <button id="uploadBtn">Upload</button>
-        <button id="refreshRefBtn" class="secondary">Refresh list</button>
         <button id="manageVoicesBtn" class="secondary">Manage Voices</button>
       </div>
       <section id="manageVoicesPanel" class="manage-voices hidden">

@@ -1,6 +1,5 @@
 const LANGUAGES = ["Auto","English","Chinese","Japanese","Korean","French","German","Spanish","Italian","Portuguese","Arabic","Russian"];
 
-const MODEL_PREFIX = 'Qwen/Qwen3-TTS-12Hz-1.7B-';
 
 const el = {
   text: document.getElementById('text'),
@@ -14,7 +13,6 @@ const el = {
   referenceAudio: document.getElementById('referenceAudio'),
   uploadFile: document.getElementById('uploadFile'),
   uploadBtn: document.getElementById('uploadBtn'),
-  refreshRefBtn: document.getElementById('refreshRefBtn'),
   manageVoicesBtn: document.getElementById('manageVoicesBtn'),
   manageVoicesPanel: document.getElementById('manageVoicesPanel'),
   voiceList: document.getElementById('voiceList'),
@@ -23,12 +21,12 @@ const el = {
   saveVoiceBtn: document.getElementById('saveVoiceBtn'),
   player: document.getElementById('player'),
   status: document.getElementById('status'),
-  modelStatusBar: document.getElementById('modelStatusBar')
+  textFileBtn: document.getElementById('textFileBtn'),
+  textFileInput: document.getElementById('textFileInput')
 };
 
 let currentMode = 'clone';
 let lastBlob = null;
-let isModelLoading = false;
 let referenceAudioFiles = [];
 
 function setStatus(msg) { el.status.textContent = msg; }
@@ -46,7 +44,6 @@ function setMode(mode) {
   for (const btn of el.modeSwitch.querySelectorAll('.mode-btn')) {
     const active = btn.dataset.mode === mode;
     btn.classList.toggle('active', active);
-    btn.classList.toggle('inactive', !active);
     btn.setAttribute('aria-checked', active ? 'true' : 'false');
   }
 
@@ -65,45 +62,6 @@ function updateSelectedReference() {
   }
   const icon = found.source === 'design' ? '🎨' : '📁';
   el.selectedRef.textContent = `${icon} ${found.filename}`;
-}
-
-function shortModelName(modelId) {
-  if (!modelId) return '';
-  return modelId.startsWith(MODEL_PREFIX) ? modelId.slice(MODEL_PREFIX.length) : modelId;
-}
-
-function renderModelStatus(modelState, modelId) {
-  const state = modelState || 'idle';
-  const shortName = shortModelName(modelId);
-
-  el.modelStatusBar.classList.remove('loading', 'ready', 'idle', 'pulse');
-
-  if (state === 'loading') {
-    el.modelStatusBar.classList.add('loading', 'pulse');
-    el.modelStatusBar.innerHTML = `🟡 <strong>Loading model...</strong>${shortName ? ` <span class="model-name">${shortName}</span>` : ''}`;
-    isModelLoading = true;
-  } else if (state === 'ready') {
-    el.modelStatusBar.classList.add('ready');
-    el.modelStatusBar.innerHTML = `🟢 <strong>Ready</strong>${shortName ? ` <span class="model-name">${shortName}</span>` : ''}`;
-    isModelLoading = false;
-  } else {
-    el.modelStatusBar.classList.add('idle');
-    el.modelStatusBar.innerHTML = '⚪ <strong>Idle</strong>';
-    isModelLoading = false;
-  }
-
-  el.generateBtn.disabled = isModelLoading;
-}
-
-async function pollStatus() {
-  try {
-    const res = await fetch('/status');
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    renderModelStatus(data.model_state, data.model_id);
-  } catch (err) {
-    renderModelStatus('idle', null);
-  }
 }
 
 function renderVoiceDropdown(current) {
@@ -214,10 +172,6 @@ async function generate() {
   const text = el.text.value.trim();
   if (!text) return setStatus('Text is required.');
 
-  if (isModelLoading) {
-    return setStatus('Model is still loading. Please wait.');
-  }
-
   if (currentMode === 'clone' && !el.referenceAudio.value) {
     return setStatus('Select reference audio in Clone mode.');
   }
@@ -257,7 +211,7 @@ async function generate() {
     el.saveVoiceBtn.disabled = false;
     setStatus('Done.');
   } finally {
-    el.generateBtn.disabled = isModelLoading;
+    el.generateBtn.disabled = false;
   }
 }
 
@@ -331,14 +285,32 @@ async function saveAsVoice() {
   }
 }
 
+
+function loadTextFromFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    el.text.value = String(reader.result || '');
+    setStatus(`Loaded ${file.name}`);
+  };
+  reader.onerror = () => setStatus('Failed to read file.');
+  reader.readAsText(file);
+}
+
 el.modeSwitch.addEventListener('click', (e) => {
   const btn = e.target.closest('.mode-btn');
   if (!btn) return;
   setMode(btn.dataset.mode);
 });
 el.referenceAudio.addEventListener('change', updateSelectedReference);
+el.textFileBtn.addEventListener('click', () => el.textFileInput.click());
+el.textFileInput.addEventListener('change', (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  loadTextFromFile(file);
+  el.textFileInput.value = '';
+});
 el.uploadBtn.addEventListener('click', uploadReferenceAudio);
-el.refreshRefBtn.addEventListener('click', () => loadReferenceAudioList());
 el.manageVoicesBtn.addEventListener('click', () => {
   el.manageVoicesPanel.classList.toggle('hidden');
 });
@@ -350,7 +322,5 @@ el.saveVoiceBtn.addEventListener('click', saveAsVoice);
   loadLanguages();
   setMode('clone');
   await loadReferenceAudioList();
-  await pollStatus();
-  setInterval(pollStatus, 3000);
   setStatus('Ready.');
 })();
