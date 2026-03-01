@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Qwen3 TTS UI</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="container">
+    <h1>Qwen3 TTS UI</h1>
+
+    <label>Text</label>
+    <textarea id="text" rows="6" placeholder="Type text to synthesize..."></textarea>
+
+    <div class="grid">
+      <div>
+        <label>Voice</label>
+        <select id="speaker"></select>
+      </div>
+      <div>
+        <label>Language</label>
+        <select id="language"></select>
+      </div>
+    </div>
+
+    <label>Instruct / style (optional)</label>
+    <input id="instruct" type="text" placeholder="Warm, confident, medium pace" />
+
+    <section class="ref-audio">
+      <h2>Reference audio</h2>
+      <div class="grid">
+        <div>
+          <label>Use reference file</label>
+          <select id="referenceAudio">
+            <option value="">None</option>
+          </select>
+        </div>
+        <div>
+          <label>Upload new file</label>
+          <input id="uploadFile" type="file" accept="audio/*" />
+        </div>
+      </div>
+      <div class="actions">
+        <button id="uploadBtn">Upload</button>
+        <button id="refreshRefBtn" class="secondary">Refresh list</button>
+      </div>
+    </section>
+
+    <div class="actions">
+      <button id="generateBtn">Generate</button>
+      <button id="downloadBtn" class="secondary" disabled>Download</button>
+    </div>
+
+    <audio id="player" controls></audio>
+    <pre id="status"></pre>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

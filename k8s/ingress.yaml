@@ -1,0 +1,17 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: qwen3-tts-ui
+  namespace: sietch-sentia
+spec:
+  rules:
+    - host: qwen-ui.sentia.lan
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: qwen3-tts-ui
+                port:
+                  number: 80
