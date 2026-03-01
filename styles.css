@@ -115,6 +115,24 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   background: rgba(255, 255, 255, 0.01);
 }
 
+.fast-toggle {
+  margin-top: 10px;
+  font-size: 0.95rem;
+}
+
+.fast-toggle label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.fast-toggle input[type="checkbox"] {
+  width: auto;
+}
+
 .hidden { display: none !important; }
 
 audio { width: 100%; margin-top: 14px; }
@@ -206,15 +224,4 @@ button.danger {
   width: 0;
   background: linear-gradient(90deg, var(--primary), #46a0ff);
   transition: width 120ms linear;
-}
-
-.mode-switch.secondary {
-  margin-top: -8px;
-  margin-bottom: 16px;
-}
-
-.mode-switch.secondary .mode-btn {
-  min-width: 140px;
-  font-size: 0.92rem;
-  padding: 7px 12px;
 }

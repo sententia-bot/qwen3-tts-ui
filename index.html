@@ -23,11 +23,6 @@
       <button type="button" class="mode-btn" data-mode="design" aria-checked="false">Design</button>
     </div>
 
-    <div class="mode-switch secondary" id="sizeSwitch" role="radiogroup" aria-label="Model size">
-      <button type="button" class="mode-btn active" data-size="quality" aria-checked="true">Quality (1.7B)</button>
-      <button type="button" class="mode-btn" data-size="fast" aria-checked="false">Fast (0.6B)</button>
-    </div>
-
     <div class="grid">
       <div>
         <label>Language</label>
@@ -57,6 +52,12 @@
           <label>Upload new file</label>
           <input id="uploadFile" type="file" accept="audio/*" />
         </div>
+      </div>
+      <div class="fast-toggle">
+        <label>
+          <input type="checkbox" id="fastCloneCheckbox" />
+          Use fast model (0.6B)
+        </label>
       </div>
       <div class="actions">
         <button id="uploadBtn">Upload</button>
