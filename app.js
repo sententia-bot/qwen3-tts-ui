@@ -15,8 +15,12 @@ const el = {
   uploadFile: document.getElementById('uploadFile'),
   uploadBtn: document.getElementById('uploadBtn'),
   refreshRefBtn: document.getElementById('refreshRefBtn'),
+  manageVoicesBtn: document.getElementById('manageVoicesBtn'),
+  manageVoicesPanel: document.getElementById('manageVoicesPanel'),
+  voiceList: document.getElementById('voiceList'),
   generateBtn: document.getElementById('generateBtn'),
   downloadBtn: document.getElementById('downloadBtn'),
+  saveVoiceBtn: document.getElementById('saveVoiceBtn'),
   player: document.getElementById('player'),
   status: document.getElementById('status'),
   modelStatusBar: document.getElementById('modelStatusBar')
@@ -25,6 +29,7 @@ const el = {
 let currentMode = 'clone';
 let lastBlob = null;
 let isModelLoading = false;
+let referenceAudioFiles = [];
 
 function setStatus(msg) { el.status.textContent = msg; }
 
@@ -53,7 +58,13 @@ function setMode(mode) {
 
 function updateSelectedReference() {
   const selected = el.referenceAudio.value;
-  el.selectedRef.textContent = selected || 'None';
+  const found = referenceAudioFiles.find((f) => f.filename === selected);
+  if (!found) {
+    el.selectedRef.textContent = selected || 'None';
+    return;
+  }
+  const icon = found.source === 'design' ? '🎨' : '📁';
+  el.selectedRef.textContent = `${icon} ${found.filename}`;
 }
 
 function shortModelName(modelId) {
@@ -95,18 +106,91 @@ async function pollStatus() {
   }
 }
 
-async function loadReferenceAudioList() {
-  const res = await fetch('/reference-audio');
-  const data = await res.json();
-  const current = el.referenceAudio.value;
+function renderVoiceDropdown(current) {
   el.referenceAudio.innerHTML = '<option value="">None</option>';
-  for (const f of (data.files || [])) {
-    const o = document.createElement('option'); o.value = f; o.textContent = f;
-    el.referenceAudio.appendChild(o);
-  }
-  if ([...el.referenceAudio.options].some(o => o.value === current)) {
+  const uploaded = referenceAudioFiles.filter((f) => (f.source || 'upload') !== 'design');
+  const designed = referenceAudioFiles.filter((f) => f.source === 'design');
+
+  const addGroup = (label, files, icon) => {
+    if (!files.length) return;
+    const group = document.createElement('optgroup');
+    group.label = label;
+    for (const file of files) {
+      const o = document.createElement('option');
+      o.value = file.filename;
+      o.textContent = `${icon} ${file.filename}`;
+      group.appendChild(o);
+    }
+    el.referenceAudio.appendChild(group);
+  };
+
+  addGroup('Uploaded', uploaded, '📁');
+  addGroup('Designed', designed, '🎨');
+
+  if ([...el.referenceAudio.options].some((o) => o.value === current)) {
     el.referenceAudio.value = current;
   }
+}
+
+function renderVoiceManagement() {
+  if (!referenceAudioFiles.length) {
+    el.voiceList.innerHTML = '<div class="voice-row">No saved voices yet.</div>';
+    return;
+  }
+
+  el.voiceList.innerHTML = '';
+  for (const file of referenceAudioFiles) {
+    const row = document.createElement('div');
+    row.className = 'voice-row';
+
+    const left = document.createElement('div');
+    left.className = 'voice-meta';
+
+    const icon = document.createElement('span');
+    icon.textContent = file.source === 'design' ? '🎨' : '📁';
+    const name = document.createElement('strong');
+    name.textContent = file.filename;
+
+    left.appendChild(icon);
+    left.appendChild(name);
+
+    if (file.source === 'design' && file.description) {
+      const desc = document.createElement('div');
+      desc.className = 'voice-description';
+      desc.textContent = file.description;
+      left.appendChild(desc);
+    }
+
+    const del = document.createElement('button');
+    del.className = 'danger';
+    del.textContent = '🗑️ Delete';
+    del.addEventListener('click', async () => {
+      if (!confirm(`Delete voice ${file.filename}?`)) return;
+      const res = await fetch(`/reference-audio/${encodeURIComponent(file.filename)}`, { method: 'DELETE' });
+      if (!res.ok) {
+        setStatus(`Delete failed: ${await res.text()}`);
+        return;
+      }
+      setStatus(`Deleted ${file.filename}`);
+      await loadReferenceAudioList();
+    });
+
+    row.appendChild(left);
+    row.appendChild(del);
+    el.voiceList.appendChild(row);
+  }
+}
+
+async function loadReferenceAudioList(preselect = null) {
+  const res = await fetch('/reference-audio');
+  const data = await res.json();
+  const current = preselect || el.referenceAudio.value;
+  referenceAudioFiles = (data.files || []).map((f) => (
+    typeof f === 'string' ? { filename: f, source: 'upload', description: null } : f
+  ));
+
+  renderVoiceDropdown(current);
+  renderVoiceManagement();
   updateSelectedReference();
 }
 
@@ -122,8 +206,7 @@ async function uploadReferenceAudio() {
   }
   setStatus(`Uploaded ${file.name}`);
   el.uploadFile.value = '';
-  await loadReferenceAudioList();
-  el.referenceAudio.value = file.name;
+  await loadReferenceAudioList(file.name);
   updateSelectedReference();
 }
 
@@ -171,6 +254,7 @@ async function generate() {
     const url = URL.createObjectURL(blob);
     el.player.src = url;
     el.downloadBtn.disabled = false;
+    el.saveVoiceBtn.disabled = false;
     setStatus('Done.');
   } finally {
     el.generateBtn.disabled = isModelLoading;
@@ -185,6 +269,68 @@ function downloadAudio() {
   a.click();
 }
 
+function toBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result || '';
+      const base64 = String(result).split(',', 2)[1];
+      if (!base64) reject(new Error('Failed to convert audio blob to base64'));
+      else resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+function makeDefaultDesignName() {
+  const d = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  return `designed_${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}.wav`;
+}
+
+async function saveAsVoice() {
+  if (!lastBlob) {
+    setStatus('Generate audio first.');
+    return;
+  }
+
+  const suggested = makeDefaultDesignName();
+  const input = prompt('Voice file name:', suggested);
+  if (input === null) return;
+
+  const filename = (input || '').trim() || suggested;
+  const normalized = filename.toLowerCase().endsWith('.wav') ? filename : `${filename}.wav`;
+
+  try {
+    const audio_b64 = await toBase64(lastBlob);
+    const payload = {
+      filename: normalized,
+      description: el.voiceDescription.value.trim() || null,
+      audio_b64,
+    };
+
+    const res = await fetch('/reference-audio/save-design', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      setStatus(`Save failed: ${await res.text()}`);
+      return;
+    }
+
+    await loadReferenceAudioList(normalized);
+    setMode('clone');
+    el.referenceAudio.value = normalized;
+    updateSelectedReference();
+    setStatus(`Saved voice as ${normalized}`);
+  } catch (err) {
+    setStatus(`Save failed: ${err.message || err}`);
+  }
+}
+
 el.modeSwitch.addEventListener('click', (e) => {
   const btn = e.target.closest('.mode-btn');
   if (!btn) return;
@@ -192,9 +338,13 @@ el.modeSwitch.addEventListener('click', (e) => {
 });
 el.referenceAudio.addEventListener('change', updateSelectedReference);
 el.uploadBtn.addEventListener('click', uploadReferenceAudio);
-el.refreshRefBtn.addEventListener('click', loadReferenceAudioList);
+el.refreshRefBtn.addEventListener('click', () => loadReferenceAudioList());
+el.manageVoicesBtn.addEventListener('click', () => {
+  el.manageVoicesPanel.classList.toggle('hidden');
+});
 el.generateBtn.addEventListener('click', generate);
 el.downloadBtn.addEventListener('click', downloadAudio);
+el.saveVoiceBtn.addEventListener('click', saveAsVoice);
 
 (async function init() {
   loadLanguages();

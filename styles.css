@@ -151,3 +151,49 @@ pre {
 @media (max-width: 720px) {
   .grid { grid-template-columns: 1fr; }
 }
+
+.manage-voices {
+  margin-top: 12px;
+  padding: 10px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  background: rgba(255,255,255,0.02);
+}
+
+.voice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.voice-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+.voice-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.voice-meta > span,
+.voice-meta > strong {
+  display: inline;
+}
+
+.voice-description {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+button.danger {
+  width: auto;
+  background: #8b2e2e;
+}

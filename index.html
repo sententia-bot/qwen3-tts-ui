@@ -53,12 +53,17 @@
       <div class="actions">
         <button id="uploadBtn">Upload</button>
         <button id="refreshRefBtn" class="secondary">Refresh list</button>
+        <button id="manageVoicesBtn" class="secondary">Manage Voices</button>
       </div>
+      <section id="manageVoicesPanel" class="manage-voices hidden">
+        <div id="voiceList" class="voice-list"></div>
+      </section>
     </section>
 
     <div class="actions">
       <button id="generateBtn">Generate</button>
       <button id="downloadBtn" class="secondary" disabled>Download</button>
+      <button id="saveVoiceBtn" class="secondary" disabled>Save as Voice</button>
     </div>
 
     <audio id="player" controls></audio>
