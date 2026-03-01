@@ -40,17 +40,15 @@ function b64ToBlob(b64, mime) {
   return new Blob([bytes], { type: mime });
 }
 
-function setProgress(pct, tokens, estimated) {
-  const safePct = Math.max(0, Math.min(100, Number(pct) || 0));
+function setProgress(bytesReceived) {
   el.progressWrap.classList.remove('hidden');
-  el.progressBar.style.width = `${safePct}%`;
-  el.progressText.textContent = `Generating... ${safePct}% (${tokens} / ${estimated} tokens)`;
+  const kb = (bytesReceived / 1024).toFixed(1);
+  el.progressText.textContent = `Generating... ${kb} KB received`;
 }
 
 function resetProgress() {
   el.progressWrap.classList.add('hidden');
-  el.progressBar.style.width = '0%';
-  el.progressText.textContent = 'Generating... 0% (0 / 1 tokens)';
+  el.progressText.textContent = '';
 }
 
 function setStatus(msg) { el.status.textContent = msg; }
@@ -210,7 +208,6 @@ async function generate() {
   el.saveVoiceBtn.disabled = true;
   lastBlob = null;
   resetProgress();
-  setProgress(0, 0, 1);
 
   try {
     const payload = {
@@ -245,10 +242,15 @@ async function generate() {
     let buffer = '';
     let eventType = null;
     let doneReceived = false;
+    let bytesReceived = 0;
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
+      if (value) {
+        bytesReceived += value.byteLength;
+        setProgress(bytesReceived);
+      }
       buffer += decoder.decode(value, { stream: true });
 
       const lines = buffer.split('\n');
@@ -275,10 +277,9 @@ async function generate() {
         }
 
         if (eventType === 'progress') {
-          setProgress(payloadData.pct ?? 0, payloadData.tokens ?? 0, payloadData.estimated_total ?? 1);
+          // token progress handled by byte counter above
         } else if (eventType === 'done') {
           doneReceived = true;
-          setProgress(100, payloadData.tokens_generated ?? 0, payloadData.tokens_generated ?? 1);
           const blob = b64ToBlob(payloadData.audio_b64, 'audio/wav');
           lastBlob = blob;
           const url = URL.createObjectURL(blob);
