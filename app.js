@@ -1,5 +1,7 @@
 const LANGUAGES = ["Auto","English","Chinese","Japanese","Korean","French","German","Spanish","Italian","Portuguese","Arabic","Russian"];
 
+const MODEL_PREFIX = 'Qwen/Qwen3-TTS-12Hz-1.7B-';
+
 const el = {
   text: document.getElementById('text'),
   language: document.getElementById('language'),
@@ -16,11 +18,13 @@ const el = {
   generateBtn: document.getElementById('generateBtn'),
   downloadBtn: document.getElementById('downloadBtn'),
   player: document.getElementById('player'),
-  status: document.getElementById('status')
+  status: document.getElementById('status'),
+  modelStatusBar: document.getElementById('modelStatusBar')
 };
 
 let currentMode = 'clone';
 let lastBlob = null;
+let isModelLoading = false;
 
 function setStatus(msg) { el.status.textContent = msg; }
 
@@ -37,6 +41,7 @@ function setMode(mode) {
   for (const btn of el.modeSwitch.querySelectorAll('.mode-btn')) {
     const active = btn.dataset.mode === mode;
     btn.classList.toggle('active', active);
+    btn.classList.toggle('inactive', !active);
     btn.setAttribute('aria-checked', active ? 'true' : 'false');
   }
 
@@ -49,6 +54,45 @@ function setMode(mode) {
 function updateSelectedReference() {
   const selected = el.referenceAudio.value;
   el.selectedRef.textContent = selected || 'None';
+}
+
+function shortModelName(modelId) {
+  if (!modelId) return '';
+  return modelId.startsWith(MODEL_PREFIX) ? modelId.slice(MODEL_PREFIX.length) : modelId;
+}
+
+function renderModelStatus(modelState, modelId) {
+  const state = modelState || 'idle';
+  const shortName = shortModelName(modelId);
+
+  el.modelStatusBar.classList.remove('loading', 'ready', 'idle', 'pulse');
+
+  if (state === 'loading') {
+    el.modelStatusBar.classList.add('loading', 'pulse');
+    el.modelStatusBar.innerHTML = `🟡 <strong>Loading model...</strong>${shortName ? ` <span class="model-name">${shortName}</span>` : ''}`;
+    isModelLoading = true;
+  } else if (state === 'ready') {
+    el.modelStatusBar.classList.add('ready');
+    el.modelStatusBar.innerHTML = `🟢 <strong>Ready</strong>${shortName ? ` <span class="model-name">${shortName}</span>` : ''}`;
+    isModelLoading = false;
+  } else {
+    el.modelStatusBar.classList.add('idle');
+    el.modelStatusBar.innerHTML = '⚪ <strong>Idle</strong>';
+    isModelLoading = false;
+  }
+
+  el.generateBtn.disabled = isModelLoading;
+}
+
+async function pollStatus() {
+  try {
+    const res = await fetch('/status');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    renderModelStatus(data.model_state, data.model_id);
+  } catch (err) {
+    renderModelStatus('idle', null);
+  }
 }
 
 async function loadReferenceAudioList() {
@@ -86,6 +130,10 @@ async function uploadReferenceAudio() {
 async function generate() {
   const text = el.text.value.trim();
   if (!text) return setStatus('Text is required.');
+
+  if (isModelLoading) {
+    return setStatus('Model is still loading. Please wait.');
+  }
 
   if (currentMode === 'clone' && !el.referenceAudio.value) {
     return setStatus('Select reference audio in Clone mode.');
@@ -125,7 +173,7 @@ async function generate() {
     el.downloadBtn.disabled = false;
     setStatus('Done.');
   } finally {
-    el.generateBtn.disabled = false;
+    el.generateBtn.disabled = isModelLoading;
   }
 }
 
@@ -152,5 +200,7 @@ el.downloadBtn.addEventListener('click', downloadAudio);
   loadLanguages();
   setMode('clone');
   await loadReferenceAudioList();
+  await pollStatus();
+  setInterval(pollStatus, 3000);
   setStatus('Ready.');
 })();

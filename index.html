@@ -10,12 +10,14 @@
   <main class="container">
     <h1>Qwen3 TTS UI</h1>
 
+    <div id="modelStatusBar" class="model-status idle" aria-live="polite">⚪ <strong>Idle</strong></div>
+
     <label>Text</label>
     <textarea id="text" rows="6" placeholder="Type text to synthesize..."></textarea>
 
     <div class="mode-switch" id="modeSwitch" role="radiogroup" aria-label="Synthesis mode">
       <button type="button" class="mode-btn active" data-mode="clone" aria-checked="true">Clone</button>
-      <button type="button" class="mode-btn" data-mode="design" aria-checked="false">Design</button>
+      <button type="button" class="mode-btn inactive" data-mode="design" aria-checked="false">Design</button>
     </div>
 
     <div class="grid">
