@@ -1,10 +1,14 @@
-const LANGUAGES = ["Auto","English","Chinese","Japanese","Korean","French","German","Spanish","Italian","Portuguese"];
+const LANGUAGES = ["Auto","English","Chinese","Japanese","Korean","French","German","Spanish","Italian","Portuguese","Arabic","Russian"];
 
 const el = {
   text: document.getElementById('text'),
-  speaker: document.getElementById('speaker'),
   language: document.getElementById('language'),
-  instruct: document.getElementById('instruct'),
+  modeSwitch: document.getElementById('modeSwitch'),
+  designSection: document.getElementById('designSection'),
+  referenceSection: document.getElementById('referenceSection'),
+  selectedRefWrap: document.getElementById('selectedRefWrap'),
+  selectedRef: document.getElementById('selectedRef'),
+  voiceDescription: document.getElementById('voiceDescription'),
   referenceAudio: document.getElementById('referenceAudio'),
   uploadFile: document.getElementById('uploadFile'),
   uploadBtn: document.getElementById('uploadBtn'),
@@ -15,19 +19,10 @@ const el = {
   status: document.getElementById('status')
 };
 
+let currentMode = 'clone';
 let lastBlob = null;
 
 function setStatus(msg) { el.status.textContent = msg; }
-
-async function loadSpeakers() {
-  const res = await fetch('/speakers');
-  const data = await res.json();
-  el.speaker.innerHTML = '';
-  for (const s of (data.speakers || [])) {
-    const o = document.createElement('option'); o.value = s; o.textContent = s;
-    el.speaker.appendChild(o);
-  }
-}
 
 function loadLanguages() {
   for (const l of LANGUAGES) {
@@ -35,6 +30,25 @@ function loadLanguages() {
     el.language.appendChild(o);
   }
   el.language.value = 'Auto';
+}
+
+function setMode(mode) {
+  currentMode = mode;
+  for (const btn of el.modeSwitch.querySelectorAll('.mode-btn')) {
+    const active = btn.dataset.mode === mode;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-checked', active ? 'true' : 'false');
+  }
+
+  const isClone = mode === 'clone';
+  el.referenceSection.classList.toggle('hidden', !isClone);
+  el.selectedRefWrap.classList.toggle('hidden', !isClone);
+  el.designSection.classList.toggle('hidden', isClone);
+}
+
+function updateSelectedReference() {
+  const selected = el.referenceAudio.value;
+  el.selectedRef.textContent = selected || 'None';
 }
 
 async function loadReferenceAudioList() {
@@ -49,6 +63,7 @@ async function loadReferenceAudioList() {
   if ([...el.referenceAudio.options].some(o => o.value === current)) {
     el.referenceAudio.value = current;
   }
+  updateSelectedReference();
 }
 
 async function uploadReferenceAudio() {
@@ -65,11 +80,20 @@ async function uploadReferenceAudio() {
   el.uploadFile.value = '';
   await loadReferenceAudioList();
   el.referenceAudio.value = file.name;
+  updateSelectedReference();
 }
 
 async function generate() {
   const text = el.text.value.trim();
   if (!text) return setStatus('Text is required.');
+
+  if (currentMode === 'clone' && !el.referenceAudio.value) {
+    return setStatus('Select reference audio in Clone mode.');
+  }
+
+  if (currentMode === 'design' && !el.voiceDescription.value.trim()) {
+    return setStatus('Voice description is required in Design mode.');
+  }
 
   setStatus('Generating...');
   el.generateBtn.disabled = true;
@@ -77,10 +101,10 @@ async function generate() {
     const payload = {
       text,
       language: el.language.value,
-      speaker: el.speaker.value || null,
-      instruct: el.instruct.value.trim() || null,
       audio_format: 'wav',
-      reference_audio: el.referenceAudio.value || null,
+      mode: currentMode,
+      reference_audio: currentMode === 'clone' ? (el.referenceAudio.value || null) : null,
+      voice_description: currentMode === 'design' ? (el.voiceDescription.value.trim() || null) : null,
     };
 
     const res = await fetch('/api/tts', {
@@ -113,6 +137,12 @@ function downloadAudio() {
   a.click();
 }
 
+el.modeSwitch.addEventListener('click', (e) => {
+  const btn = e.target.closest('.mode-btn');
+  if (!btn) return;
+  setMode(btn.dataset.mode);
+});
+el.referenceAudio.addEventListener('change', updateSelectedReference);
 el.uploadBtn.addEventListener('click', uploadReferenceAudio);
 el.refreshRefBtn.addEventListener('click', loadReferenceAudioList);
 el.generateBtn.addEventListener('click', generate);
@@ -120,7 +150,7 @@ el.downloadBtn.addEventListener('click', downloadAudio);
 
 (async function init() {
   loadLanguages();
-  await loadSpeakers();
+  setMode('clone');
   await loadReferenceAudioList();
   setStatus('Ready.');
 })();

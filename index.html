@@ -13,21 +13,28 @@
     <label>Text</label>
     <textarea id="text" rows="6" placeholder="Type text to synthesize..."></textarea>
 
+    <div class="mode-switch" id="modeSwitch" role="radiogroup" aria-label="Synthesis mode">
+      <button type="button" class="mode-btn active" data-mode="clone" aria-checked="true">Clone</button>
+      <button type="button" class="mode-btn" data-mode="design" aria-checked="false">Design</button>
+    </div>
+
     <div class="grid">
-      <div>
-        <label>Voice</label>
-        <select id="speaker"></select>
-      </div>
       <div>
         <label>Language</label>
         <select id="language"></select>
       </div>
+      <div id="selectedRefWrap">
+        <label>Selected reference</label>
+        <div id="selectedRef" class="selected-ref">None</div>
+      </div>
     </div>
 
-    <label>Instruct / style (optional)</label>
-    <input id="instruct" type="text" placeholder="Warm, confident, medium pace" />
+    <section id="designSection" class="design-section hidden">
+      <label for="voiceDescription">Describe the voice</label>
+      <textarea id="voiceDescription" rows="3" placeholder="deep British male, slightly raspy, calm pace"></textarea>
+    </section>
 
-    <section class="ref-audio">
+    <section id="referenceSection" class="ref-audio">
       <h2>Reference audio</h2>
       <div class="grid">
         <div>
