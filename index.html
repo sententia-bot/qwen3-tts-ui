@@ -53,12 +53,6 @@
           <input id="uploadFile" type="file" accept="audio/*" />
         </div>
       </div>
-      <div class="fast-toggle">
-        <label>
-          <input type="checkbox" id="fastCloneCheckbox" />
-          Use fast model (0.6B)
-        </label>
-      </div>
       <div class="actions">
         <button id="uploadBtn">Upload</button>
         <button id="manageVoicesBtn" class="secondary">Manage Voices</button>
@@ -67,6 +61,13 @@
         <div id="voiceList" class="voice-list"></div>
       </section>
     </section>
+
+    <div class="fast-toggle" id="fastToggleRow">
+      <label>
+        <input type="checkbox" id="fastCloneCheckbox" />
+        Use fast model (0.6B)
+      </label>
+    </div>
 
     <div class="actions">
       <button id="generateBtn">Generate</button>
