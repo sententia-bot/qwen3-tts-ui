@@ -5,6 +5,7 @@ const el = {
   text: document.getElementById('text'),
   language: document.getElementById('language'),
   modeSwitch: document.getElementById('modeSwitch'),
+  sizeSwitch: document.getElementById('sizeSwitch'),
   designSection: document.getElementById('designSection'),
   referenceSection: document.getElementById('referenceSection'),
   selectedRefWrap: document.getElementById('selectedRefWrap'),
@@ -29,6 +30,7 @@ const el = {
 };
 
 let currentMode = 'clone';
+let currentSize = 'quality';
 let lastBlob = null;
 let referenceAudioFiles = [];
 
@@ -63,6 +65,15 @@ function loadLanguages() {
     el.language.appendChild(o);
   }
   el.language.value = 'Auto';
+}
+
+function setSize(size) {
+  currentSize = size;
+  for (const btn of el.sizeSwitch.querySelectorAll('.mode-btn')) {
+    const active = btn.dataset.size === size;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-checked', active ? 'true' : 'false');
+  }
 }
 
 function setMode(mode) {
@@ -229,6 +240,7 @@ async function generate() {
       language: el.language.value,
       audio_format: 'wav',
       mode: currentMode,
+      model_size: currentSize,
       reference_audio: currentMode === 'clone' ? (el.referenceAudio.value || null) : null,
       voice_description: currentMode === 'design' ? (el.voiceDescription.value.trim() || null) : null,
     };
@@ -349,6 +361,11 @@ el.modeSwitch.addEventListener('click', (e) => {
   if (!btn) return;
   setMode(btn.dataset.mode);
 });
+el.sizeSwitch.addEventListener('click', (e) => {
+  const btn = e.target.closest('.mode-btn');
+  if (!btn) return;
+  setSize(btn.dataset.size);
+});
 el.referenceAudio.addEventListener('change', updateSelectedReference);
 el.textFileBtn.addEventListener('click', () => el.textFileInput.click());
 el.textFileInput.addEventListener('change', (e) => {
@@ -368,6 +385,7 @@ el.saveVoiceBtn.addEventListener('click', saveAsVoice);
 (async function init() {
   loadLanguages();
   setMode('clone');
+  setSize('quality');
   await loadReferenceAudioList();
   setStatus('Ready.');
 })();

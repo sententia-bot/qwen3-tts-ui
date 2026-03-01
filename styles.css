@@ -207,3 +207,14 @@ button.danger {
   background: linear-gradient(90deg, var(--primary), #46a0ff);
   transition: width 120ms linear;
 }
+
+.mode-switch.secondary {
+  margin-top: -8px;
+  margin-bottom: 16px;
+}
+
+.mode-switch.secondary .mode-btn {
+  min-width: 140px;
+  font-size: 0.92rem;
+  padding: 7px 12px;
+}
