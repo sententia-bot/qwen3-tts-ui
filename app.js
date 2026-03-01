@@ -40,10 +40,14 @@ function b64ToBlob(b64, mime) {
   return new Blob([bytes], { type: mime });
 }
 
-function setProgress(bytesReceived) {
+function setProgress(elapsedSeconds, estimatedSeconds) {
   el.progressWrap.classList.remove('hidden');
-  const kb = (bytesReceived / 1024).toFixed(1);
-  el.progressText.textContent = `Generating... ${kb} KB received`;
+  const est = estimatedSeconds || 0;
+  if (est > 0) {
+    el.progressText.textContent = `Generating... ${elapsedSeconds}s elapsed (est. ${est}s)`;
+  } else {
+    el.progressText.textContent = `Generating... ${elapsedSeconds}s elapsed`;
+  }
 }
 
 function resetProgress() {
@@ -209,6 +213,16 @@ async function generate() {
   lastBlob = null;
   resetProgress();
 
+  // Simple elapsed-time + rough estimate indicator
+  const chars = text.length;
+  const estimatedSeconds = Math.max(5, Math.round(chars / 25)); // ~25 chars/sec heuristic
+  let elapsed = 0;
+  setProgress(elapsed, estimatedSeconds);
+  const timer = setInterval(() => {
+    elapsed += 1;
+    setProgress(elapsed, estimatedSeconds);
+  }, 1000);
+
   try {
     const payload = {
       text,
@@ -219,7 +233,7 @@ async function generate() {
       voice_description: currentMode === 'design' ? (el.voiceDescription.value.trim() || null) : null,
     };
 
-    const res = await fetch('/api/tts/stream', {
+    const res = await fetch('/api/tts', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -231,75 +245,19 @@ async function generate() {
       return;
     }
 
-    if (!res.body) {
-      resetProgress();
-      setStatus('Generation failed: no response stream body.');
-      return;
-    }
-
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-    let eventType = null;
-    let doneReceived = false;
-    let bytesReceived = 0;
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      if (value) {
-        bytesReceived += value.byteLength;
-        setProgress(bytesReceived);
-      }
-      buffer += decoder.decode(value, { stream: true });
-
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-
-      for (const rawLine of lines) {
-        const line = rawLine.trimEnd();
-        if (!line) {
-          eventType = null;
-          continue;
-        }
-        if (line.startsWith('event: ')) {
-          eventType = line.slice(7).trim();
-          continue;
-        }
-        if (!line.startsWith('data: ')) continue;
-
-        let payloadData;
-        try {
-          payloadData = JSON.parse(line.slice(6));
-        } catch (err) {
-          setStatus(`Stream parse error: ${err.message || err}`);
-          continue;
-        }
-
-        if (eventType === 'progress') {
-          // token progress handled by byte counter above
-        } else if (eventType === 'done') {
-          doneReceived = true;
-          const blob = b64ToBlob(payloadData.audio_b64, 'audio/wav');
-          lastBlob = blob;
-          const url = URL.createObjectURL(blob);
-          el.player.src = url;
-          el.downloadBtn.disabled = false;
-          el.saveVoiceBtn.disabled = false;
-          setStatus('Done.');
-          resetProgress();
-        } else if (eventType === 'error') {
-          resetProgress();
-          setStatus(`Generation failed: ${payloadData.detail || 'unknown error'}`);
-        }
-      }
-    }
-
-    if (!doneReceived && lastBlob === null) {
-      resetProgress();
-      setStatus('Generation ended without done event.');
-    }
+    const blob = await res.blob();
+    lastBlob = blob;
+    const url = URL.createObjectURL(blob);
+    el.player.src = url;
+    el.downloadBtn.disabled = false;
+    el.saveVoiceBtn.disabled = false;
+    setStatus(`Done in ${elapsed}s (est. ${estimatedSeconds}s)`);
+    resetProgress();
+  } catch (err) {
+    resetProgress();
+    setStatus(`Generation failed: ${err.message || err}`);
   } finally {
+    clearInterval(timer);
     el.generateBtn.disabled = false;
   }
 }
