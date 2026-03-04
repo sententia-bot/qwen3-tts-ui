@@ -43,19 +43,16 @@ function b64ToBlob(b64, mime) {
   return new Blob([bytes], { type: mime });
 }
 
-function setProgress(elapsedSeconds, estimatedSeconds) {
+function setProgress(text, pct) {
   el.progressWrap.classList.remove('hidden');
-  const est = estimatedSeconds || 0;
-  if (est > 0) {
-    el.progressText.textContent = `Generating... ${elapsedSeconds}s elapsed (est. ${est}s)`;
-  } else {
-    el.progressText.textContent = `Generating... ${elapsedSeconds}s elapsed`;
-  }
+  el.progressText.textContent = text;
+  if (pct != null) el.progressBar.style.width = `${Math.min(100, pct)}%`;
 }
 
 function resetProgress() {
   el.progressWrap.classList.add('hidden');
   el.progressText.textContent = '';
+  el.progressBar.style.width = '0%';
 }
 
 function setStatus(msg) { el.status.textContent = msg; }
@@ -250,15 +247,10 @@ async function generate() {
   lastBlob = null;
   resetProgress();
 
-  // Simple elapsed-time + rough estimate indicator
-  const chars = text.length;
-  const estimatedSeconds = Math.max(5, Math.round(chars / 18)); // tuned: ~18 chars/sec on your setup
+  // Elapsed-time counter (shown while waiting for first SSE event)
   let elapsed = 0;
-  setProgress(elapsed, estimatedSeconds);
-  const timer = setInterval(() => {
-    elapsed += 1;
-    setProgress(elapsed, estimatedSeconds);
-  }, 1000);
+  setProgress('Starting...', 0);
+  const timer = setInterval(() => { elapsed += 1; }, 1000);
 
   try {
     const payload = {
@@ -271,7 +263,7 @@ async function generate() {
       voice_description: currentMode === 'design' ? (el.voiceDescription.value.trim() || null) : null,
     };
 
-    const res = await fetch('/api/tts', {
+    const res = await fetch('/api/tts/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -283,14 +275,65 @@ async function generate() {
       return;
     }
 
-    const blob = await res.blob();
-    lastBlob = blob;
-    const url = URL.createObjectURL(blob);
-    el.player.src = url;
-    el.downloadBtn.disabled = false;
-    el.saveVoiceBtn.disabled = false;
-    setStatus(`Done in ${elapsed}s (est. ${estimatedSeconds}s)`);
-    resetProgress();
+    // Parse SSE stream manually
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let lastEventType = '';
+
+    outer: while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      const lines = buffer.split('\n');
+      buffer = lines.pop(); // keep incomplete last line
+
+      for (const line of lines) {
+        if (line.startsWith('event: ')) {
+          lastEventType = line.slice(7).trim();
+        } else if (line.startsWith('data: ')) {
+          let data;
+          try { data = JSON.parse(line.slice(6)); } catch { continue; }
+
+          if (lastEventType === 'chunk_start') {
+            const label = data.of > 1
+              ? `Chunk ${data.chunk}/${data.of} — generating...`
+              : 'Generating...';
+            setProgress(label, data.of > 1 ? ((data.chunk - 1) / data.of) * 100 : 0);
+
+          } else if (lastEventType === 'progress') {
+            const label = data.of > 1
+              ? `Chunk ${data.chunk}/${data.of} — ${data.chunk_pct}%`
+              : `Generating... ${data.chunk_pct}%`;
+            setProgress(label, data.of > 1 ? data.overall_pct : data.chunk_pct);
+
+          } else if (lastEventType === 'chunk_done') {
+            const pct = (data.chunk / data.of) * 100;
+            const label = data.of > 1
+              ? `Chunk ${data.chunk}/${data.of} done ✓`
+              : 'Done generating, encoding...';
+            setProgress(label, pct);
+
+          } else if (lastEventType === 'done') {
+            const blob = b64ToBlob(data.audio_b64, 'audio/wav');
+            lastBlob = blob;
+            const url = URL.createObjectURL(blob);
+            el.player.src = url;
+            el.downloadBtn.disabled = false;
+            el.saveVoiceBtn.disabled = false;
+            setStatus(`Done in ${elapsed}s`);
+            resetProgress();
+            break outer;
+
+          } else if (lastEventType === 'error') {
+            resetProgress();
+            setStatus(`Generation failed: ${data.detail || 'unknown error'}`);
+            break outer;
+          }
+        }
+      }
+    }
   } catch (err) {
     resetProgress();
     setStatus(`Generation failed: ${err.message || err}`);
