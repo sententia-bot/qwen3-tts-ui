@@ -37,14 +37,14 @@
     <section id="designSection" class="design-section hidden">
       <div class="preset-row" id="presetRow">
         <label for="voicePresetSelect">Preset</label>
-        <div class="preset-controls">
+        <div class="preset-select-row">
           <select id="voicePresetSelect"><option value="">— none —</option></select>
-          <button type="button" id="loadPresetBtn" class="secondary">Load</button>
+        </div>
+        <div class="preset-actions-row">
+          <button type="button" id="loadPresetBtn">Load Preset</button>
+          <button id="managePresetsBtn" type="button" class="secondary">Manage Presets</button>
         </div>
         <small id="presetHint" class="preset-hint"></small>
-      </div>
-      <div class="actions">
-        <button id="managePresetsBtn" type="button" class="secondary">Manage Presets</button>
       </div>
       <section id="managePresetsPanel" class="manage-voices hidden">
         <div id="presetList" class="voice-list"></div>
@@ -83,11 +83,11 @@
       </label>
     </div>
 
-    <div class="actions">
+    <div class="actions" id="mainActions">
       <button id="generateBtn">Generate</button>
       <button id="downloadBtn" class="secondary" disabled>Download</button>
       <button id="saveVoiceBtn" class="secondary" disabled>Save as Voice</button>
-      <button id="savePresetBtn" class="secondary" type="button">Save Preset</button>
+      <button id="savePresetBtn" class="secondary" type="button">Save as Preset</button>
       <button id="hardResetBtn" class="danger" type="button">Hard Reset</button>
     </div>
 

@@ -100,6 +100,9 @@ function setMode(mode) {
   el.fastToggleRow.classList.toggle('hidden', !isClone);
   el.fastCloneCheckbox.disabled = !isClone;
 
+  if (el.savePresetBtn) el.savePresetBtn.classList.toggle('hidden', isClone);
+  if (el.saveVoiceBtn) el.saveVoiceBtn.classList.toggle('hidden', isClone);
+
   if (!isClone) {
     loadVoicePresets();
   }
