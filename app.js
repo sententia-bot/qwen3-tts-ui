@@ -12,6 +12,7 @@ const el = {
   voiceDescription: document.getElementById('voiceDescription'),
   voicePresetSelect: document.getElementById('voicePresetSelect'),
   loadPresetBtn: document.getElementById('loadPresetBtn'),
+  savePresetBtn: document.getElementById('savePresetBtn'),
   presetHint: document.getElementById('presetHint'),
   referenceAudio: document.getElementById('referenceAudio'),
   fastToggleRow: document.getElementById('fastToggleRow'),
@@ -207,6 +208,39 @@ function loadSelectedPresetIntoDescription() {
   }
   el.voiceDescription.value = preset.voice_description || '';
   updatePresetHint();
+}
+
+async function saveAsPreset() {
+  const voiceDesc = el.voiceDescription.value.trim();
+  if (!voiceDesc) return setStatus('Enter a voice description first.');
+
+  const name = prompt('Preset name:');
+  if (!name) return;
+  const trimmedName = name.trim();
+  if (!trimmedName) return;
+
+  const description = prompt('Short description (optional):') || '';
+
+  try {
+    const res = await fetch(`/voice-presets?user=${encodeURIComponent(activeUser)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: trimmedName,
+        voice_description: voiceDesc,
+        description: description.trim() || null,
+      }),
+    });
+    if (!res.ok) {
+      setStatus(`Save preset failed: ${await res.text()}`);
+      return;
+    }
+    setStatus(`Preset "${trimmedName}" saved.`);
+    await loadVoicePresets();
+    el.voicePresetSelect.value = trimmedName;
+  } catch (err) {
+    setStatus(`Save preset failed: ${err.message || err}`);
+  }
 }
 
 async function loadVoicePresets() {
@@ -536,6 +570,7 @@ function bindElementEvents() {
   else console.error('[qwen3-tts-ui] Missing #referenceAudio');
 
   if (el.loadPresetBtn) el.loadPresetBtn.addEventListener('click', loadSelectedPresetIntoDescription);
+  if (el.savePresetBtn) el.savePresetBtn.addEventListener('click', saveAsPreset);
   if (el.voicePresetSelect) el.voicePresetSelect.addEventListener('change', updatePresetHint);
 
   if (el.textFileBtn && el.textFileInput) {
