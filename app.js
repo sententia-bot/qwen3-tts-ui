@@ -34,7 +34,17 @@ const el = {
 let currentMode = 'clone';
 let lastBlob = null;
 let referenceAudioFiles = [];
-const activeUser = new URLSearchParams(window.location.search).get('user') || 'default';
+
+function getActiveUser() {
+  try {
+    return new URLSearchParams(window.location.search).get('user') || 'default';
+  } catch (err) {
+    console.error('[qwen3-tts-ui] Failed to parse user query param, falling back to default', err);
+    return 'default';
+  }
+}
+
+const activeUser = getActiveUser();
 
 
 function b64ToBlob(b64, mime) {
@@ -170,32 +180,43 @@ function renderVoiceManagement() {
 }
 
 async function loadReferenceAudioList(preselect = null) {
-  const res = await fetch(`/reference-audio?user=${encodeURIComponent(activeUser)}`);
-  const data = await res.json();
-  const current = preselect || el.referenceAudio.value;
-  referenceAudioFiles = (data.files || []).map((f) => (
-    typeof f === 'string' ? { filename: f, source: 'upload', description: null } : f
-  ));
+  try {
+    const res = await fetch(`/reference-audio?user=${encodeURIComponent(activeUser)}`);
+    if (!res.ok) throw new Error(`reference-audio failed: ${res.status}`);
+    const data = await res.json();
+    const current = preselect || el.referenceAudio.value;
+    referenceAudioFiles = (data.files || []).map((f) => (
+      typeof f === 'string' ? { filename: f, source: 'upload', description: null } : f
+    ));
 
-  renderVoiceDropdown(current);
-  renderVoiceManagement();
-  updateSelectedReference();
+    renderVoiceDropdown(current);
+    renderVoiceManagement();
+    updateSelectedReference();
+  } catch (err) {
+    console.error('[qwen3-tts-ui] loadReferenceAudioList failed', err);
+    setStatus(`Failed to load voices: ${err.message || err}`);
+  }
 }
 
 async function uploadReferenceAudio() {
-  const file = el.uploadFile.files[0];
-  if (!file) return setStatus('Select a file first.');
-  const fd = new FormData();
-  fd.append('file', file);
-  const res = await fetch(`/reference-audio/upload?user=${encodeURIComponent(activeUser)}`, { method: 'POST', body: fd });
-  if (!res.ok) {
-    setStatus(`Upload failed: ${await res.text()}`);
-    return;
+  try {
+    const file = el.uploadFile.files[0];
+    if (!file) return setStatus('Select a file first.');
+    const fd = new FormData();
+    fd.append('file', file);
+    const res = await fetch(`/reference-audio/upload?user=${encodeURIComponent(activeUser)}`, { method: 'POST', body: fd });
+    if (!res.ok) {
+      setStatus(`Upload failed: ${await res.text()}`);
+      return;
+    }
+    setStatus(`Uploaded ${file.name}`);
+    el.uploadFile.value = '';
+    await loadReferenceAudioList(file.name);
+    updateSelectedReference();
+  } catch (err) {
+    console.error('[qwen3-tts-ui] uploadReferenceAudio failed', err);
+    setStatus(`Upload failed: ${err.message || err}`);
   }
-  setStatus(`Uploaded ${file.name}`);
-  el.uploadFile.value = '';
-  await loadReferenceAudioList(file.name);
-  updateSelectedReference();
 }
 
 async function hardReset() {
@@ -433,48 +454,91 @@ function loadTextFromFile(file) {
   reader.readAsText(file);
 }
 
-el.modeSwitch.addEventListener('click', (e) => {
-  const btn = e.target.closest('.mode-btn');
-  if (!btn) return;
-  setMode(btn.dataset.mode);
-});
-el.referenceAudio.addEventListener('change', updateSelectedReference);
-el.textFileBtn.addEventListener('click', () => el.textFileInput.click());
-el.textFileInput.addEventListener('change', (e) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
-  loadTextFromFile(file);
-  el.textFileInput.value = '';
-});
-el.uploadBtn.addEventListener('click', uploadReferenceAudio);
-el.manageVoicesBtn.addEventListener('click', () => {
-  el.manageVoicesPanel.classList.toggle('hidden');
-});
-el.generateBtn.addEventListener('click', generate);
-el.downloadBtn.addEventListener('click', downloadAudio);
-el.saveVoiceBtn.addEventListener('click', saveAsVoice);
-el.hardResetBtn.addEventListener('click', hardReset);
+function bindElementEvents() {
+  if (el.modeSwitch) {
+    el.modeSwitch.addEventListener('click', (e) => {
+      const btn = e.target.closest('.mode-btn');
+      if (!btn) return;
+      setMode(btn.dataset.mode);
+    });
+  } else {
+    console.error('[qwen3-tts-ui] Missing #modeSwitch');
+  }
+
+  if (el.referenceAudio) el.referenceAudio.addEventListener('change', updateSelectedReference);
+  else console.error('[qwen3-tts-ui] Missing #referenceAudio');
+
+  if (el.textFileBtn && el.textFileInput) {
+    el.textFileBtn.addEventListener('click', () => el.textFileInput.click());
+    el.textFileInput.addEventListener('change', (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      loadTextFromFile(file);
+      el.textFileInput.value = '';
+    });
+  } else {
+    console.error('[qwen3-tts-ui] Missing #textFileBtn or #textFileInput');
+  }
+
+  if (el.uploadBtn) el.uploadBtn.addEventListener('click', uploadReferenceAudio);
+  if (el.manageVoicesBtn && el.manageVoicesPanel) {
+    el.manageVoicesBtn.addEventListener('click', () => {
+      el.manageVoicesPanel.classList.toggle('hidden');
+    });
+  }
+  if (el.generateBtn) el.generateBtn.addEventListener('click', generate);
+  if (el.downloadBtn) el.downloadBtn.addEventListener('click', downloadAudio);
+  if (el.saveVoiceBtn) el.saveVoiceBtn.addEventListener('click', saveAsVoice);
+  if (el.hardResetBtn) el.hardResetBtn.addEventListener('click', hardReset);
+}
 
 async function checkApiStatus() {
   const dot = document.getElementById('apiStatus');
   if (!dot) return;
   try {
-    const res = await fetch('/healthz', { signal: AbortSignal.timeout(4000) });
+    let res;
+    if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+      res = await fetch('/healthz', { signal: AbortSignal.timeout(4000) });
+    } else {
+      // Browser fallback for environments that do not support AbortSignal.timeout
+      res = await fetch('/healthz');
+    }
     dot.className = 'api-status ' + (res.ok ? 'online' : 'offline');
     dot.title = res.ok ? 'API online' : 'API unreachable';
-  } catch {
+  } catch (err) {
+    console.error('[qwen3-tts-ui] checkApiStatus failed', err);
     dot.className = 'api-status offline';
     dot.title = 'API unreachable';
   }
 }
 
+function logMissingElements() {
+  const missing = Object.entries(el)
+    .filter(([, node]) => !node)
+    .map(([key]) => key);
+  if (missing.length) {
+    console.error('[qwen3-tts-ui] Missing required DOM elements:', missing.join(', '));
+  }
+}
+
 (async function init() {
-  const activeUserLabel = document.getElementById('activeUserLabel');
-  if (activeUserLabel) activeUserLabel.textContent = 'user: ' + activeUser;
-  loadLanguages();
-  setMode('clone');
-  await loadReferenceAudioList();
-  setStatus('Ready.');
-  await checkApiStatus();
-  setInterval(checkApiStatus, 30000);
+  try {
+    console.log('[qwen3-tts-ui] init start', { activeUser, search: window.location.search });
+    logMissingElements();
+    bindElementEvents();
+
+    const activeUserLabel = document.getElementById('activeUserLabel');
+    if (activeUserLabel) activeUserLabel.textContent = 'user: ' + activeUser;
+
+    loadLanguages();
+    setMode('clone');
+    await loadReferenceAudioList();
+    setStatus('Ready.');
+    await checkApiStatus();
+    setInterval(checkApiStatus, 30000);
+    console.log('[qwen3-tts-ui] init complete');
+  } catch (err) {
+    console.error('[qwen3-tts-ui] init failed', err);
+    setStatus(`Init failed: ${err.message || err}`);
+  }
 })();
