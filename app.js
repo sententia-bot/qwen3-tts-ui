@@ -34,6 +34,7 @@ const el = {
 let currentMode = 'clone';
 let lastBlob = null;
 let referenceAudioFiles = [];
+const activeUser = new URLSearchParams(window.location.search).get('user') || 'default';
 
 
 function b64ToBlob(b64, mime) {
@@ -153,7 +154,7 @@ function renderVoiceManagement() {
     del.textContent = '🗑️ Delete';
     del.addEventListener('click', async () => {
       if (!confirm(`Delete voice ${file.filename}?`)) return;
-      const res = await fetch(`/reference-audio/${encodeURIComponent(file.filename)}`, { method: 'DELETE' });
+      const res = await fetch(`/reference-audio/${encodeURIComponent(file.filename)}?user=${encodeURIComponent(activeUser)}`, { method: 'DELETE' });
       if (!res.ok) {
         setStatus(`Delete failed: ${await res.text()}`);
         return;
@@ -169,7 +170,7 @@ function renderVoiceManagement() {
 }
 
 async function loadReferenceAudioList(preselect = null) {
-  const res = await fetch('/reference-audio');
+  const res = await fetch(`/reference-audio?user=${encodeURIComponent(activeUser)}`);
   const data = await res.json();
   const current = preselect || el.referenceAudio.value;
   referenceAudioFiles = (data.files || []).map((f) => (
@@ -186,7 +187,7 @@ async function uploadReferenceAudio() {
   if (!file) return setStatus('Select a file first.');
   const fd = new FormData();
   fd.append('file', file);
-  const res = await fetch('/reference-audio/upload', { method: 'POST', body: fd });
+  const res = await fetch(`/reference-audio/upload?user=${encodeURIComponent(activeUser)}`, { method: 'POST', body: fd });
   if (!res.ok) {
     setStatus(`Upload failed: ${await res.text()}`);
     return;
@@ -220,11 +221,15 @@ async function hardReset() {
     el.player.load();
     el.downloadBtn.disabled = true;
     el.saveVoiceBtn.disabled = true;
-    setStatus('Hard reset complete. Model state cleared.');
+    el.generateBtn.disabled = true;
+    setStatus('Hard reset complete. Model state cleared. Waiting for GPU to settle...');
+    await new Promise(r => setTimeout(r, 3000));
+    setStatus('Ready.');
   } catch (err) {
     setStatus(`Hard reset failed: ${err.message || err}`);
   } finally {
     el.hardResetBtn.disabled = false;
+    el.generateBtn.disabled = false;
   }
 }
 
@@ -261,6 +266,7 @@ async function generate() {
       model_size: currentMode === 'clone' && el.fastCloneCheckbox.checked ? 'fast' : 'quality',
       reference_audio: currentMode === 'clone' ? (el.referenceAudio.value || null) : null,
       voice_description: currentMode === 'design' ? (el.voiceDescription.value.trim() || null) : null,
+      user: activeUser,
     };
 
     const res = await fetch('/api/tts/stream', {
@@ -297,21 +303,23 @@ async function generate() {
           try { data = JSON.parse(line.slice(6)); } catch { continue; }
 
           if (lastEventType === 'chunk_start') {
+            const done = data.chunk - 1;
             const label = data.of > 1
-              ? `Chunk ${data.chunk}/${data.of} — generating...`
+              ? `${done}/${data.of} chunks done — generating...`
               : 'Generating...';
-            setProgress(label, data.of > 1 ? ((data.chunk - 1) / data.of) * 100 : 0);
+            setProgress(label, data.of > 1 ? (done / data.of) * 100 : 0);
 
           } else if (lastEventType === 'progress') {
+            const done = data.chunk - 1;
             const label = data.of > 1
-              ? `Chunk ${data.chunk}/${data.of} — ${data.chunk_pct}%`
+              ? `${done}/${data.of} chunks done — ${data.chunk_pct}%`
               : `Generating... ${data.chunk_pct}%`;
             setProgress(label, data.of > 1 ? data.overall_pct : data.chunk_pct);
 
           } else if (lastEventType === 'chunk_done') {
             const pct = (data.chunk / data.of) * 100;
             const label = data.of > 1
-              ? `Chunk ${data.chunk}/${data.of} done ✓`
+              ? `${data.chunk}/${data.of} chunks done ✓`
               : 'Done generating, encoding...';
             setProgress(label, pct);
 
@@ -392,7 +400,7 @@ async function saveAsVoice() {
       audio_b64,
     };
 
-    const res = await fetch('/reference-audio/save-design', {
+    const res = await fetch(`/reference-audio/save-design?user=${encodeURIComponent(activeUser)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -448,6 +456,8 @@ el.saveVoiceBtn.addEventListener('click', saveAsVoice);
 el.hardResetBtn.addEventListener('click', hardReset);
 
 (async function init() {
+  const activeUserLabel = document.getElementById('activeUserLabel');
+  if (activeUserLabel) activeUserLabel.textContent = 'user: ' + activeUser;
   loadLanguages();
   setMode('clone');
   await loadReferenceAudioList();
