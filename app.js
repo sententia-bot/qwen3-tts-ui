@@ -10,6 +10,9 @@ const el = {
   selectedRefWrap: document.getElementById('selectedRefWrap'),
   selectedRef: document.getElementById('selectedRef'),
   voiceDescription: document.getElementById('voiceDescription'),
+  voicePresetSelect: document.getElementById('voicePresetSelect'),
+  loadPresetBtn: document.getElementById('loadPresetBtn'),
+  presetHint: document.getElementById('presetHint'),
   referenceAudio: document.getElementById('referenceAudio'),
   fastToggleRow: document.getElementById('fastToggleRow'),
   fastCloneCheckbox: document.getElementById('fastCloneCheckbox'),
@@ -34,6 +37,7 @@ const el = {
 let currentMode = 'clone';
 let lastBlob = null;
 let referenceAudioFiles = [];
+let voicePresets = [];
 
 function getActiveUser() {
   try {
@@ -91,6 +95,10 @@ function setMode(mode) {
   el.designSection.classList.toggle('hidden', isClone);
   el.fastToggleRow.classList.toggle('hidden', !isClone);
   el.fastCloneCheckbox.disabled = !isClone;
+
+  if (!isClone) {
+    loadVoicePresets();
+  }
 }
 
 function updateSelectedReference() {
@@ -176,6 +184,65 @@ function renderVoiceManagement() {
     row.appendChild(left);
     row.appendChild(del);
     el.voiceList.appendChild(row);
+  }
+}
+
+function getSelectedPreset() {
+  const name = el.voicePresetSelect?.value || '';
+  if (!name) return null;
+  return voicePresets.find((p) => p.name === name) || null;
+}
+
+function updatePresetHint() {
+  if (!el.presetHint) return;
+  const preset = getSelectedPreset();
+  el.presetHint.textContent = preset?.description || '';
+}
+
+function loadSelectedPresetIntoDescription() {
+  const preset = getSelectedPreset();
+  if (!preset) {
+    updatePresetHint();
+    return;
+  }
+  el.voiceDescription.value = preset.voice_description || '';
+  updatePresetHint();
+}
+
+async function loadVoicePresets() {
+  if (!el.voicePresetSelect) return;
+  try {
+    const res = await fetch(`/voice-presets?user=${encodeURIComponent(activeUser)}`);
+    if (!res.ok) throw new Error(`voice-presets failed: ${res.status}`);
+    const data = await res.json();
+    voicePresets = Array.isArray(data.presets) ? data.presets : [];
+
+    const current = el.voicePresetSelect.value;
+    el.voicePresetSelect.innerHTML = '';
+    const blank = document.createElement('option');
+    blank.value = '';
+    blank.textContent = '— none —';
+    el.voicePresetSelect.appendChild(blank);
+
+    for (const preset of voicePresets) {
+      if (!preset?.name) continue;
+      const o = document.createElement('option');
+      o.value = preset.name;
+      o.textContent = preset.name;
+      el.voicePresetSelect.appendChild(o);
+    }
+
+    if ([...el.voicePresetSelect.options].some((o) => o.value === current)) {
+      el.voicePresetSelect.value = current;
+    } else {
+      el.voicePresetSelect.value = '';
+    }
+    updatePresetHint();
+  } catch (err) {
+    console.error('[qwen3-tts-ui] loadVoicePresets failed', err);
+    voicePresets = [];
+    if (el.voicePresetSelect) el.voicePresetSelect.innerHTML = '<option value="">— none —</option>';
+    if (el.presetHint) el.presetHint.textContent = '';
   }
 }
 
@@ -468,6 +535,9 @@ function bindElementEvents() {
   if (el.referenceAudio) el.referenceAudio.addEventListener('change', updateSelectedReference);
   else console.error('[qwen3-tts-ui] Missing #referenceAudio');
 
+  if (el.loadPresetBtn) el.loadPresetBtn.addEventListener('click', loadSelectedPresetIntoDescription);
+  if (el.voicePresetSelect) el.voicePresetSelect.addEventListener('change', updatePresetHint);
+
   if (el.textFileBtn && el.textFileInput) {
     el.textFileBtn.addEventListener('click', () => el.textFileInput.click());
     el.textFileInput.addEventListener('change', (e) => {
@@ -533,6 +603,7 @@ function logMissingElements() {
     loadLanguages();
     setMode('clone');
     await loadReferenceAudioList();
+    await loadVoicePresets();
     setStatus('Ready.');
     await checkApiStatus();
     setInterval(checkApiStatus, 30000);

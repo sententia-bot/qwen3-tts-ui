@@ -35,6 +35,14 @@
     </div>
 
     <section id="designSection" class="design-section hidden">
+      <div class="preset-row" id="presetRow">
+        <label for="voicePresetSelect">Preset</label>
+        <div class="preset-controls">
+          <select id="voicePresetSelect"><option value="">— none —</option></select>
+          <button type="button" id="loadPresetBtn" class="secondary">Load</button>
+        </div>
+        <small id="presetHint" class="preset-hint"></small>
+      </div>
       <label for="voiceDescription">Describe the voice</label>
       <textarea id="voiceDescription" rows="3" placeholder="deep British male, slightly raspy, calm pace"></textarea>
     </section>

@@ -134,6 +134,11 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   width: auto;
 }
 
+.preset-row { margin-bottom: 12px; }
+.preset-controls { display: flex; gap: 8px; align-items: center; }
+.preset-controls select { flex: 1; }
+.preset-hint { color: var(--muted); font-size: 0.85rem; display: block; margin-top: 4px; }
+
 .hidden { display: none !important; }
 
 audio { width: 100%; margin-top: 14px; }
