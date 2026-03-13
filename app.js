@@ -455,6 +455,19 @@ el.downloadBtn.addEventListener('click', downloadAudio);
 el.saveVoiceBtn.addEventListener('click', saveAsVoice);
 el.hardResetBtn.addEventListener('click', hardReset);
 
+async function checkApiStatus() {
+  const dot = document.getElementById('apiStatus');
+  if (!dot) return;
+  try {
+    const res = await fetch('/healthz', { signal: AbortSignal.timeout(4000) });
+    dot.className = 'api-status ' + (res.ok ? 'online' : 'offline');
+    dot.title = res.ok ? 'API online' : 'API unreachable';
+  } catch {
+    dot.className = 'api-status offline';
+    dot.title = 'API unreachable';
+  }
+}
+
 (async function init() {
   const activeUserLabel = document.getElementById('activeUserLabel');
   if (activeUserLabel) activeUserLabel.textContent = 'user: ' + activeUser;
@@ -462,4 +475,6 @@ el.hardResetBtn.addEventListener('click', hardReset);
   setMode('clone');
   await loadReferenceAudioList();
   setStatus('Ready.');
+  await checkApiStatus();
+  setInterval(checkApiStatus, 30000);
 })();

@@ -226,3 +226,13 @@ button.danger {
   background: linear-gradient(90deg, var(--primary), #46a0ff);
   transition: width 120ms linear;
 }
+
+.api-status {
+  font-size: 0.7em;
+  vertical-align: middle;
+  margin-left: 6px;
+  color: #555;
+  transition: color 0.3s;
+}
+.api-status.online  { color: #4caf50; }
+.api-status.offline { color: #f44336; }
