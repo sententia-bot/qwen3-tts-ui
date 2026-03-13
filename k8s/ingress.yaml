@@ -3,6 +3,10 @@ kind: Ingress
 metadata:
   name: qwen3-tts-ui
   namespace: sietch-sentia
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls.certresolver: letsencrypt
 spec:
   rules:
     - host: qwen-ui.sentia.lan
@@ -25,3 +29,7 @@ spec:
                 name: qwen3-tts-ui
                 port:
                   number: 80
+  tls:
+    - hosts:
+        - tts.albindalbert.dev
+      secretName: qwen3-tts-ui-tls
