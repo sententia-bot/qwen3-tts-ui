@@ -14,6 +14,9 @@ const el = {
   loadPresetBtn: document.getElementById('loadPresetBtn'),
   savePresetBtn: document.getElementById('savePresetBtn'),
   presetHint: document.getElementById('presetHint'),
+  managePresetsBtn: document.getElementById('managePresetsBtn'),
+  managePresetsPanel: document.getElementById('managePresetsPanel'),
+  presetList: document.getElementById('presetList'),
   referenceAudio: document.getElementById('referenceAudio'),
   fastToggleRow: document.getElementById('fastToggleRow'),
   fastCloneCheckbox: document.getElementById('fastCloneCheckbox'),
@@ -210,16 +213,89 @@ function loadSelectedPresetIntoDescription() {
   updatePresetHint();
 }
 
+function renderPresetManagement() {
+  if (!el.presetList) return;
+
+  if (!voicePresets.length) {
+    el.presetList.innerHTML = '<div class="voice-row">No saved presets yet.</div>';
+    return;
+  }
+
+  el.presetList.innerHTML = '';
+  for (const preset of voicePresets) {
+    if (!preset?.name) continue;
+
+    const row = document.createElement('div');
+    row.className = 'voice-row';
+
+    const left = document.createElement('div');
+    left.className = 'voice-meta';
+
+    const icon = document.createElement('span');
+    icon.textContent = '🎛️';
+    const name = document.createElement('strong');
+    name.textContent = preset.name;
+
+    left.appendChild(icon);
+    left.appendChild(name);
+
+    const descText = preset.description || preset.voice_description || 'No description';
+    const desc = document.createElement('div');
+    desc.className = 'voice-description';
+    desc.textContent = descText;
+    left.appendChild(desc);
+
+    const del = document.createElement('button');
+    del.className = 'danger';
+    del.textContent = '🗑️ Delete';
+    del.addEventListener('click', async () => {
+      if (!confirm(`Delete preset ${preset.name}?`)) return;
+      try {
+        const res = await fetch(`/voice-presets/${encodeURIComponent(preset.name)}?user=${encodeURIComponent(activeUser)}`, { method: 'DELETE' });
+        if (!res.ok) {
+          setStatus(`Delete preset failed: ${await res.text()}`);
+          return;
+        }
+        setStatus(`Deleted preset "${preset.name}".`);
+        await loadVoicePresets();
+      } catch (err) {
+        setStatus(`Delete preset failed: ${err.message || err}`);
+      }
+    });
+
+    row.appendChild(left);
+    row.appendChild(del);
+    el.presetList.appendChild(row);
+  }
+}
+
 async function saveAsPreset() {
+  console.log('[preset] saveAsPreset clicked for user', activeUser);
+
   const voiceDesc = el.voiceDescription.value.trim();
-  if (!voiceDesc) return setStatus('Enter a voice description first.');
+  if (!voiceDesc) {
+    setStatus('Enter a voice description first.');
+    return;
+  }
 
   const name = prompt('Preset name:');
-  if (!name) return;
-  const trimmedName = name.trim();
-  if (!trimmedName) return;
+  if (name === null) {
+    setStatus('Save preset cancelled.');
+    return;
+  }
 
-  const description = prompt('Short description (optional):') || '';
+  const trimmedName = name.trim();
+  if (!trimmedName) {
+    setStatus('Preset name is required.');
+    return;
+  }
+
+  const descriptionInput = prompt('Short description (optional):');
+  if (descriptionInput === null) {
+    setStatus('Save preset cancelled.');
+    return;
+  }
+  const description = descriptionInput.trim();
 
   try {
     const res = await fetch(`/voice-presets?user=${encodeURIComponent(activeUser)}`, {
@@ -228,7 +304,7 @@ async function saveAsPreset() {
       body: JSON.stringify({
         name: trimmedName,
         voice_description: voiceDesc,
-        description: description.trim() || null,
+        description: description || null,
       }),
     });
     if (!res.ok) {
@@ -238,6 +314,7 @@ async function saveAsPreset() {
     setStatus(`Preset "${trimmedName}" saved.`);
     await loadVoicePresets();
     el.voicePresetSelect.value = trimmedName;
+    updatePresetHint();
   } catch (err) {
     setStatus(`Save preset failed: ${err.message || err}`);
   }
@@ -272,11 +349,13 @@ async function loadVoicePresets() {
       el.voicePresetSelect.value = '';
     }
     updatePresetHint();
+    renderPresetManagement();
   } catch (err) {
     console.error('[qwen3-tts-ui] loadVoicePresets failed', err);
     voicePresets = [];
     if (el.voicePresetSelect) el.voicePresetSelect.innerHTML = '<option value="">— none —</option>';
     if (el.presetHint) el.presetHint.textContent = '';
+    renderPresetManagement();
   }
 }
 
@@ -572,6 +651,11 @@ function bindElementEvents() {
   if (el.loadPresetBtn) el.loadPresetBtn.addEventListener('click', loadSelectedPresetIntoDescription);
   if (el.savePresetBtn) el.savePresetBtn.addEventListener('click', saveAsPreset);
   if (el.voicePresetSelect) el.voicePresetSelect.addEventListener('change', updatePresetHint);
+  if (el.managePresetsBtn && el.managePresetsPanel) {
+    el.managePresetsBtn.addEventListener('click', () => {
+      el.managePresetsPanel.classList.toggle('hidden');
+    });
+  }
 
   if (el.textFileBtn && el.textFileInput) {
     el.textFileBtn.addEventListener('click', () => el.textFileInput.click());
