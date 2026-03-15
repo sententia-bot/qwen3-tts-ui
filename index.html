@@ -76,11 +76,13 @@
       </section>
     </section>
 
-    <div class="fast-toggle" id="fastToggleRow">
-      <label>
-        <input type="checkbox" id="fastCloneCheckbox" checked />
-        Use fast model (0.6B)
-      </label>
+    <div class="fast-toggle" id="modelSizeRow">
+      <label for="modelSizeSelect">Model size</label>
+      <select id="modelSizeSelect">
+        <option value="auto" selected>Auto</option>
+        <option value="fast">Fast (0.6B)</option>
+        <option value="quality">Quality (1.7B)</option>
+      </select>
     </div>
 
     <div class="actions" id="mainActions">

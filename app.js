@@ -18,8 +18,8 @@ const el = {
   managePresetsPanel: document.getElementById('managePresetsPanel'),
   presetList: document.getElementById('presetList'),
   referenceAudio: document.getElementById('referenceAudio'),
-  fastToggleRow: document.getElementById('fastToggleRow'),
-  fastCloneCheckbox: document.getElementById('fastCloneCheckbox'),
+  modelSizeRow: document.getElementById('modelSizeRow'),
+  modelSizeSelect: document.getElementById('modelSizeSelect'),
   uploadFile: document.getElementById('uploadFile'),
   uploadBtn: document.getElementById('uploadBtn'),
   manageVoicesBtn: document.getElementById('manageVoicesBtn'),
@@ -97,8 +97,6 @@ function setMode(mode) {
   el.referenceSection.classList.toggle('hidden', !isClone);
   el.selectedRefWrap.classList.toggle('hidden', !isClone);
   el.designSection.classList.toggle('hidden', isClone);
-  el.fastToggleRow.classList.toggle('hidden', !isClone);
-  el.fastCloneCheckbox.disabled = !isClone;
 
   if (el.savePresetBtn) el.savePresetBtn.classList.toggle('hidden', isClone);
   if (el.saveVoiceBtn) el.saveVoiceBtn.classList.toggle('hidden', isClone);
@@ -467,7 +465,7 @@ async function generate() {
       language: el.language.value,
       audio_format: 'wav',
       mode: currentMode,
-      model_size: currentMode === 'clone' && el.fastCloneCheckbox.checked ? 'fast' : 'quality',
+      model_size: el.modelSizeSelect.value,
       reference_audio: currentMode === 'clone' ? (el.referenceAudio.value || null) : null,
       voice_description: currentMode === 'design' ? (el.voiceDescription.value.trim() || null) : null,
       user: activeUser,
