@@ -97,6 +97,7 @@ function setMode(mode) {
   el.referenceSection.classList.toggle('hidden', !isClone);
   el.selectedRefWrap.classList.toggle('hidden', !isClone);
   el.designSection.classList.toggle('hidden', isClone);
+  if (el.modelSizeRow) el.modelSizeRow.classList.toggle('hidden', !isClone);
 
   if (el.savePresetBtn) el.savePresetBtn.classList.toggle('hidden', isClone);
   if (el.saveVoiceBtn) el.saveVoiceBtn.classList.toggle('hidden', isClone);
